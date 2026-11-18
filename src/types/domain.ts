@@ -235,53 +235,50 @@ export const STATUS_CONFIG: Record<RepairStatus, StatusVisualConfig> = {
     label: 'Esperando piezas',
     shortLabel: 'Esperando piezas',
     tone: 'amber',
-    timelineStage: 2,
+    timelineStage: 1,
     description: 'Hemos solicitado los recambios necesarios al proveedor.',
   },
   'En reparación': {
     label: 'En reparación',
     shortLabel: 'En reparación',
     tone: 'blue',
-    timelineStage: 3,
+    timelineStage: 1,
     description: 'El equipo mecánico está trabajando activamente en tu vehículo.',
   },
   'En revisión y pruebas': {
     label: 'En revisión y pruebas',
     shortLabel: 'En pruebas',
     tone: 'indigo',
-    timelineStage: 4,
+    timelineStage: 1,
     description: 'Realizando verificaciones de seguridad y control de calidad.',
   },
   'Reparación finalizada': {
     label: 'Reparación finalizada',
     shortLabel: 'Finalizado',
     tone: 'teal',
-    timelineStage: 4,
+    timelineStage: 1,
     description: 'Intervención completada, preparando el vehículo para entrega.',
   },
   'Listo para recoger': {
     label: 'Listo para recoger',
     shortLabel: 'Listo para recoger',
     tone: 'emerald',
-    timelineStage: 5,
+    timelineStage: 2,
     description: 'Tu vehículo está terminado y disponible para recogida en taller.',
   },
   'Vehículo entregado': {
     label: 'Vehículo entregado',
     shortLabel: 'Entregado',
     tone: 'zinc',
-    timelineStage: 5,
+    timelineStage: 2,
     description: 'El vehículo ha sido entregado al cliente.',
   },
 };
 
 export const PUBLIC_TIMELINE_STEPS = [
-  { stage: 0, title: 'Vehículo recibido', subtitle: 'Entrada confirmada' },
-  { stage: 1, title: 'Diagnóstico', subtitle: 'Revisión y presupuesto' },
-  { stage: 2, title: 'Esperando piezas', subtitle: 'Gestión de recambios' },
-  { stage: 3, title: 'En reparación', subtitle: 'Intervención técnica' },
-  { stage: 4, title: 'Revisión', subtitle: 'Control de calidad' },
-  { stage: 5, title: 'Listo para recoger', subtitle: 'Disponible en taller' },
+  { stage: 0, title: 'Vehículo recibido', subtitle: 'Entrada confirmada en el taller' },
+  { stage: 1, title: 'En reparación', subtitle: 'Diagnóstico y trabajo técnico en curso' },
+  { stage: 2, title: 'Listo para recoger', subtitle: 'Disponible para recogida en taller' },
 ] as const;
 
 export const DEFAULT_MESSAGE_TEMPLATES: Record<RepairStatus, string> = {

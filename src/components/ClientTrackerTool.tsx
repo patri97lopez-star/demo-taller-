@@ -244,7 +244,7 @@ export function ClientTrackerTool({
             </div>
           )}
 
-          {/* 6-stage visual timeline */}
+          {/* 3-stage visual timeline */}
           <div className="p-6 sm:p-8 border-b border-slate-200">
             <div className="flex items-center justify-between mb-5">
               <h5 className="text-sm font-semibold text-slate-900 font-display">
@@ -257,7 +257,7 @@ export function ClientTrackerTool({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {PUBLIC_TIMELINE_STEPS.map((step) => {
                 const completed = isDelivered || step.stage < currentStage;
                 const active = !isDelivered && step.stage === currentStage;

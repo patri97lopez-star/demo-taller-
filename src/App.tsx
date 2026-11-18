@@ -5,6 +5,7 @@ import { AdminLogin } from './components/AdminLogin';
 import { ClientsView } from './components/ClientsView';
 import { DashboardView } from './components/DashboardView';
 import { NotificationsView } from './components/NotificationsView';
+import { PublicTrackingPage } from './components/PublicTrackingPage';
 import { PublicWebsite } from './components/PublicWebsite';
 import { RegisterVehicleForm } from './components/RegisterVehicleForm';
 import { RepairDetailView } from './components/RepairDetailView';
@@ -21,14 +22,25 @@ import type {
   RepairStatus,
 } from './types/domain';
 
-type AppEnvironment = 'portal' | 'admin';
+type AppRoute = 'website' | 'consulta' | 'admin';
+
+function parseHashRoute(): { route: AppRoute; query: string } {
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#/admin')) {
+    return { route: 'admin', query: '' };
+  }
+  if (hash.startsWith('#/consulta') || hash.startsWith('#/portal')) {
+    const qIdx = hash.indexOf('?q=');
+    const query = qIdx >= 0 ? decodeURIComponent(hash.slice(qIdx + 3)) : '';
+    return { route: 'consulta', query };
+  }
+  return { route: 'website', query: '' };
+}
 
 export default function App() {
-  const [environment, setEnvironment] = useState<AppEnvironment>(() => {
-    if (window.location.hash.startsWith('#/admin')) return 'admin';
-    return 'portal';
-  });
-  const [portalQuery, setPortalQuery] = useState<string>('');
+  const initial = parseHashRoute();
+  const [route, setRoute] = useState<AppRoute>(initial.route);
+  const [portalQuery, setPortalQuery] = useState<string>(initial.query);
 
   // Auth state
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -45,6 +57,17 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notificacion[]>([]);
   const [workshopConfig, setWorkshopConfig] = useState<ConfiguracionTaller | null>(null);
   const [loadingAdmin, setLoadingAdmin] = useState(false);
+
+  // Listen to browser back/forward hash navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const parsed = parseHashRoute();
+      setRoute(parsed.route);
+      setPortalQuery(parsed.query);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const loadAllAdminData = useCallback(async () => {
     setLoadingAdmin(true);
@@ -100,20 +123,29 @@ export default function App() {
 
   // Load admin data when entering authenticated admin environment
   useEffect(() => {
-    if (environment === 'admin' && authenticated) {
+    if (route === 'admin' && authenticated) {
       loadAllAdminData();
     }
-  }, [environment, authenticated, loadAllAdminData]);
+  }, [route, authenticated, loadAllAdminData]);
 
-  function navigateToPortal(plate?: string) {
+  function navigateToWebsite() {
+    setPortalQuery('');
+    setRoute('website');
+    window.location.hash = '#/';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function navigateToConsulta(plate?: string) {
     setPortalQuery(plate ?? '');
-    setEnvironment('portal');
-    window.location.hash = plate ? `#/portal?q=${encodeURIComponent(plate)}` : '#/portal';
+    setRoute('consulta');
+    window.location.hash = plate ? `#/consulta?q=${encodeURIComponent(plate)}` : '#/consulta';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function navigateToAdmin() {
-    setEnvironment('admin');
+    setRoute('admin');
     window.location.hash = '#/admin';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function handleLoginSuccess(session: { usuario: string; rol: string }) {
@@ -126,7 +158,7 @@ export default function App() {
   async function handleLogout() {
     await api.logout();
     setAuthenticated(false);
-    navigateToPortal();
+    navigateToWebsite();
   }
 
   function handleOpenRepair(repairId: string) {
@@ -192,10 +224,20 @@ export default function App() {
     await loadAllAdminData();
   }
 
-  if (environment === 'portal') {
+  if (route === 'website') {
     return (
       <PublicWebsite
+        onOpenConsulta={() => navigateToConsulta()}
+        onNavigateAdmin={navigateToAdmin}
+      />
+    );
+  }
+
+  if (route === 'consulta') {
+    return (
+      <PublicTrackingPage
         initialQuery={portalQuery}
+        onBackToWebsite={navigateToWebsite}
         onNavigateAdmin={navigateToAdmin}
       />
     );
@@ -213,7 +255,7 @@ export default function App() {
     return (
       <AdminLogin
         onSuccess={handleLoginSuccess}
-        onBackToPortal={() => navigateToPortal()}
+        onBackToPortal={navigateToWebsite}
       />
     );
   }
@@ -242,7 +284,7 @@ export default function App() {
       unreadNotifications={unreadCount}
       breadcrumb={breadcrumbMap[activeSection]}
       onNavigate={(section) => setActiveSection(section)}
-      onOpenPortal={() => navigateToPortal()}
+      onOpenPortal={() => navigateToConsulta()}
       onLogout={handleLogout}
     >
       {activeSection === 'dashboard' && (
@@ -283,7 +325,7 @@ export default function App() {
           onUpdateStatus={handleUpdateRepairStatus}
           onUpdateDetails={handleUpdateRepairDetails}
           onDeliver={handleDeliverVehicle}
-          onPreviewInPortal={(plate) => navigateToPortal(plate)}
+          onPreviewInPortal={(plate) => navigateToConsulta(plate)}
         />
       )}
 
