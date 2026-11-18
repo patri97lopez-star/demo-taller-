@@ -9,6 +9,7 @@ import type {
   RepairFullRecord,
   RepairStatus,
 } from '../types/domain';
+import { localDemoEngine } from './localDemoEngine';
 
 const SESSION_KEY = 'taller_track_session_token';
 
@@ -32,7 +33,11 @@ export function setStoredSessionToken(token: string | null): void {
   }
 }
 
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function requestWithFallback<T>(
+  url: string,
+  options: RequestInit,
+  fallbackFn: () => T | Promise<T>
+): Promise<T> {
   const token = getStoredSessionToken();
   const headers = new Headers(options.headers);
   if (!headers.has('Content-Type') && options.body) {
@@ -42,48 +47,91 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     headers.set('x-workshop-session', token);
   }
 
-  const res = await fetch(url, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || 'Error en la comunicación con el servidor.');
-    (err as Error & { status?: number }).status = res.status;
-    throw err;
+  try {
+    const res = await fetch(url, { ...options, headers });
+    const contentType = res.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+
+    // Static hosting (e.g. Vercel static Vite deployment without /api function) returns non-JSON 404/405
+    if (!isJson && (res.status === 404 || res.status === 405 || res.status === 500)) {
+      return await fallbackFn();
+    }
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'Error en la comunicación con el servidor.');
+      (err as Error & { status?: number }).status = res.status;
+      throw err;
+    }
+    return data as T;
+  } catch (err) {
+    // Only fall back on network errors or missing static backend routes, not intentional API validation errors
+    if (err instanceof Error && 'status' in err) {
+      throw err;
+    }
+    return await fallbackFn();
   }
-  return data as T;
 }
 
 export const api = {
   // Public Client Portal
-  getPublicConfig: () => request<PublicWorkshopInfo>('/api/public/config'),
+  getPublicConfig: () =>
+    requestWithFallback<PublicWorkshopInfo>('/api/public/config', {}, () =>
+      localDemoEngine.getPublicConfig()
+    ),
   trackVehicle: (query: string) =>
-    request<PublicTrackingResult>(`/api/public/track?q=${encodeURIComponent(query)}`),
+    requestWithFallback<PublicTrackingResult>(
+      `/api/public/track?q=${encodeURIComponent(query)}`,
+      {},
+      () => localDemoEngine.trackVehicle(query)
+    ),
 
   // Authentication
   login: async (payload: { usuario?: string; password?: string; demoQuickAccess?: boolean }) => {
-    const res = await request<{ token: string; usuario: string; rol: string }>(
+    const res = await requestWithFallback<{ token: string; usuario: string; rol: string }>(
       '/api/auth/login',
       {
         method: 'POST',
         body: JSON.stringify(payload),
-      }
+      },
+      () => localDemoEngine.login(payload)
     );
     setStoredSessionToken(res.token);
     return res;
   },
   checkSession: () =>
-    request<{ authenticated: boolean; usuario?: string; rol?: string }>('/api/auth/session'),
+    requestWithFallback<{ authenticated: boolean; usuario?: string; rol?: string }>(
+      '/api/auth/session',
+      {},
+      () => localDemoEngine.checkSession(getStoredSessionToken())
+    ),
   logout: async () => {
     try {
-      await request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
+      await requestWithFallback<{ ok: boolean }>(
+        '/api/auth/logout',
+        { method: 'POST' },
+        () => ({ ok: true })
+      );
     } finally {
       setStoredSessionToken(null);
     }
   },
 
   // Admin Operations
-  getDashboard: () => request<DashboardSummary>('/api/admin/dashboard'),
-  getRepairs: () => request<RepairFullRecord[]>('/api/admin/repairs'),
-  getRepairById: (id: string) => request<RepairFullRecord>(`/api/admin/repairs/${id}`),
+  getDashboard: () =>
+    requestWithFallback<DashboardSummary>('/api/admin/dashboard', {}, () =>
+      localDemoEngine.getDashboard()
+    ),
+  getRepairs: () =>
+    requestWithFallback<RepairFullRecord[]>('/api/admin/repairs', {}, () =>
+      localDemoEngine.getRepairs()
+    ),
+  getRepairById: (id: string) =>
+    requestWithFallback<RepairFullRecord>(`/api/admin/repairs/${id}`, {}, () => {
+      const found = localDemoEngine.getRepairs().find((r) => r.reparacion.id === id);
+      if (!found) throw new Error('Reparación no encontrada.');
+      return found;
+    }),
   registerVehicle: (payload: {
     matricula: string;
     marca: string;
@@ -98,10 +146,14 @@ export const api = {
     observaciones_publicas?: string;
     estado_inicial?: RepairStatus;
   }) =>
-    request<RepairFullRecord>('/api/admin/repairs', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    requestWithFallback<RepairFullRecord>(
+      '/api/admin/repairs',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      () => localDemoEngine.registerVehicle(payload)
+    ),
   updateRepairStatus: (
     id: string,
     payload: {
@@ -114,10 +166,14 @@ export const api = {
       generar_notificacion?: boolean;
     }
   ) =>
-    request<RepairFullRecord>(`/api/admin/repairs/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    }),
+    requestWithFallback<RepairFullRecord>(
+      `/api/admin/repairs/${id}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      () => localDemoEngine.updateRepairStatus(id, payload)
+    ),
   updateRepairDetails: (
     id: string,
     payload: {
@@ -133,26 +189,73 @@ export const api = {
       observaciones_privadas?: string;
     }
   ) =>
-    request<RepairFullRecord>(`/api/admin/repairs/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    }),
+    requestWithFallback<RepairFullRecord>(
+      `/api/admin/repairs/${id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+      () => localDemoEngine.updateRepairDetails(id, payload)
+    ),
   deliverVehicle: (id: string) =>
-    request<RepairFullRecord>(`/api/admin/repairs/${id}/deliver`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
-  getClients: () => request<ClientWithDetails[]>('/api/admin/clients'),
-  getNotifications: () => request<Notificacion[]>('/api/admin/notifications'),
+    requestWithFallback<RepairFullRecord>(
+      `/api/admin/repairs/${id}/deliver`,
+      {
+        method: 'POST',
+        body: JSON.stringify({}),
+      },
+      () =>
+        localDemoEngine.updateRepairStatus(id, {
+          nuevo_estado: 'Vehículo entregado',
+          observacion_publica: 'Vehículo entregado al propietario.',
+          observacion_privada: 'Entrega registrada desde gestión de vehículos.',
+          autor: 'Recepción Taller',
+          generar_notificacion: true,
+        })
+    ),
+  getClients: () =>
+    requestWithFallback<ClientWithDetails[]>('/api/admin/clients', {}, () =>
+      localDemoEngine.getClients()
+    ),
+  getNotifications: () =>
+    requestWithFallback<Notificacion[]>('/api/admin/notifications', {}, () =>
+      localDemoEngine.getNotifications()
+    ),
   markNotificationRead: (id: string) =>
-    request<Notificacion>(`/api/admin/notifications/${id}/read`, { method: 'POST' }),
+    requestWithFallback<Notificacion>(
+      `/api/admin/notifications/${id}/read`,
+      { method: 'POST' },
+      () => localDemoEngine.markNotificationRead(id)
+    ),
   markAllNotificationsRead: () =>
-    request<{ ok: boolean }>('/api/admin/notifications/read-all', { method: 'POST' }),
-  getWorkshopConfig: () => request<ConfiguracionTaller>('/api/admin/config'),
+    requestWithFallback<{ ok: boolean }>(
+      '/api/admin/notifications/read-all',
+      { method: 'POST' },
+      () => {
+        localDemoEngine.markAllNotificationsRead();
+        return { ok: true };
+      }
+    ),
+  getWorkshopConfig: () =>
+    requestWithFallback<ConfiguracionTaller>('/api/admin/config', {}, () =>
+      localDemoEngine.getWorkshopConfig()
+    ),
   updateWorkshopConfig: (payload: Partial<ConfiguracionTaller>) =>
-    request<ConfiguracionTaller>('/api/admin/config', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }),
-  resetDemo: () => request<{ ok: boolean }>('/api/admin/reset-demo', { method: 'POST' }),
+    requestWithFallback<ConfiguracionTaller>(
+      '/api/admin/config',
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      () => localDemoEngine.updateWorkshopConfig(payload)
+    ),
+  resetDemo: () =>
+    requestWithFallback<{ ok: boolean }>(
+      '/api/admin/reset-demo',
+      { method: 'POST' },
+      () => {
+        localDemoEngine.resetDemo();
+        return { ok: true };
+      }
+    ),
 };
