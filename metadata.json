@@ -1,0 +1,6 @@
+{
+  "name": "TALLER TRACK",
+  "description": "Software de automatización y seguimiento de vehículos en tiempo real para talleres mecánicos. Desarrollado por TEMIS ATRILE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
