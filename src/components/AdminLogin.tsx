@@ -8,8 +8,8 @@ interface AdminLoginProps {
 }
 
 export function AdminLogin({ onSuccess, onBackToPortal }: AdminLoginProps) {
-  const [usuario, setUsuario] = useState('admin@tallertrack.es');
-  const [password, setPassword] = useState('taller2026');
+  const [usuario, setUsuario] = useState('demo');
+  const [password, setPassword] = useState('1234');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
@@ -110,12 +110,13 @@ export function AdminLogin({ onSuccess, onBackToPortal }: AdminLoginProps) {
                 htmlFor="login-email"
                 className="block text-xs font-semibold text-slate-700 mb-1.5"
               >
-                Usuario o correo profesional
+                Usuario o correo de acceso
               </label>
               <input
                 id="login-email"
-                type="email"
+                type="text"
                 required
+                placeholder="Ej. demo"
                 value={usuario}
                 onChange={(e) => setUsuario(e.target.value)}
                 className="w-full h-11 px-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
@@ -171,10 +172,12 @@ export function AdminLogin({ onSuccess, onBackToPortal }: AdminLoginProps) {
           <div className="mt-6 p-3.5 rounded-lg bg-slate-50 border border-slate-200 flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="text-xs text-slate-600 space-y-1">
-              <p className="font-medium text-slate-800">Credenciales de prueba incluidas</p>
+              <p className="font-medium text-slate-800">
+                Acceso libre de prototipo (vale cualquier usuario y clave)
+              </p>
               <p>
-                Usuario: <span className="font-mono text-slate-900">admin@tallertrack.es</span> · Clave:{' '}
-                <span className="font-mono text-slate-900">taller2026</span>
+                Ejemplo preconfigurado: Usuario <span className="font-mono font-semibold text-slate-900">demo</span> · Contraseña{' '}
+                <span className="font-mono font-semibold text-slate-900">1234</span>
               </p>
             </div>
           </div>

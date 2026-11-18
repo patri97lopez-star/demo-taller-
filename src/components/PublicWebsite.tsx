@@ -315,7 +315,7 @@ export function PublicWebsite({ initialQuery = '', onNavigateAdmin }: PublicWebs
                         <span>Abrir panel de administración</span>
                       </button>
                       <span className="text-xs text-slate-500 font-mono">
-                        Demo: admin@tallertrack.es · taller2026
+                        Ejemplo: usuario demo · clave 1234 (acceso abierto en prototipo)
                       </span>
                     </div>
                   </div>

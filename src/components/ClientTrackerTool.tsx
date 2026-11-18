@@ -138,7 +138,7 @@ export function ClientTrackerTool({
 
       {/* Quick demo test buttons */}
       <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
-        <span>Prueba directa con matrículas de ejemplo:</span>
+        <span>Escribe cualquier matrícula o prueba estas de ejemplo:</span>
         {DEMO_PLATES.map((demo) => (
           <button
             key={demo.plate}
@@ -176,6 +176,12 @@ export function ClientTrackerTool({
       {/* Live Vehicle Result Card */}
       {result && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden text-left">
+          {result.es_simulacion_prototipo && (
+            <div className="px-6 sm:px-8 py-3 bg-blue-50 border-b border-blue-200 text-xs text-blue-900">
+              Vista de prueba del prototipo para la matrícula{' '}
+              <span className="font-mono font-bold">{result.matricula}</span>: estado simulado automáticamente para demostración. Si das de alta esta matrícula en el Panel del Taller, verás su ficha real.
+            </div>
+          )}
           <div className="p-6 sm:p-8 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="flex flex-wrap items-center gap-3">

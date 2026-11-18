@@ -138,6 +138,7 @@ export interface PublicTrackingResult {
     observacion_publica: string;
   }>;
   taller: PublicWorkshopInfo;
+  es_simulacion_prototipo?: boolean;
 }
 
 export interface ClientWithDetails {

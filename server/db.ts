@@ -22,7 +22,9 @@ import type {
   Vehiculo,
 } from '../src/types/domain.ts';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL
+  ? path.join('/tmp', 'taller-track-data')
+  : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'taller-track-db.json');
 
 export function normalizePlate(plate: string): string {
@@ -526,7 +528,10 @@ export function findPublicTracking(query: string): PublicTrackingResult | null {
     }
   }
 
-  if (!matchedRepair) return null;
+  if (!matchedRepair) {
+    if (normalizedPlate.length < 4) return null;
+    return buildPrototypeTrackingForPlate(normalizedPlate);
+  }
 
   const vehiculo = db.vehiculos.find((v) => v.id === matchedRepair.vehiculo_id);
   if (!vehiculo) return null;
@@ -553,6 +558,169 @@ export function findPublicTracking(query: string): PublicTrackingResult | null {
     observaciones_publicas: matchedRepair.observaciones_publicas,
     historial_publico,
     taller: getPublicWorkshopInfo(),
+    es_simulacion_prototipo: false,
+  };
+}
+
+const PROTOTYPE_VEHICLES: Array<{ marca: string; modelo: string }> = [
+  { marca: 'Peugeot', modelo: '308' },
+  { marca: 'Renault', modelo: 'Clio' },
+  { marca: 'Ford', modelo: 'Focus' },
+  { marca: 'Audi', modelo: 'A3' },
+  { marca: 'Hyundai', modelo: 'Tucson' },
+  { marca: 'Kia', modelo: 'Sportage' },
+  { marca: 'Opel', modelo: 'Corsa' },
+  { marca: 'Mazda', modelo: '3' },
+  { marca: 'Nissan', modelo: 'Qashqai' },
+  { marca: 'Citroën', modelo: 'C4' },
+];
+
+const PROTOTYPE_SCENARIOS: Array<{
+  estado: RepairStatus;
+  observacion: string;
+  pasos: Array<{ estado: RepairStatus; nota: string; horasAtras: number }>;
+}> = [
+  {
+    estado: 'Pendiente de diagnóstico',
+    observacion:
+      'Vehículo recepcionado en el taller. En cola técnica para iniciar la comprobación inicial en elevador.',
+    pasos: [
+      {
+        estado: 'Vehículo recibido',
+        nota: 'Entrada registrada en recepción del taller.',
+        horasAtras: 5,
+      },
+      {
+        estado: 'Pendiente de diagnóstico',
+        nota: 'Asignado a técnico para revisión inicial.',
+        horasAtras: 4,
+      },
+    ],
+  },
+  {
+    estado: 'Diagnóstico realizado',
+    observacion:
+      'Hemos completado la diagnosis electrónica y mecánica. En breve te enviaremos el detalle de la intervención.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Recepción completada.', horasAtras: 18 },
+      { estado: 'Pendiente de diagnóstico', nota: 'Vehículo en elevador.', horasAtras: 14 },
+      {
+        estado: 'Diagnóstico realizado',
+        nota: 'Localizada incidencia en sistema de frenado y sensores.',
+        horasAtras: 6,
+      },
+    ],
+  },
+  {
+    estado: 'Esperando autorización del cliente',
+    observacion:
+      'El presupuesto ya está preparado. Necesitamos tu confirmación para solicitar las piezas y comenzar la reparación.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Recepción en taller.', horasAtras: 26 },
+      { estado: 'Diagnóstico realizado', nota: 'Revisión técnica finalizada.', horasAtras: 20 },
+      {
+        estado: 'Esperando autorización del cliente',
+        nota: 'Presupuesto enviado pendiente de aceptación.',
+        horasAtras: 8,
+      },
+    ],
+  },
+  {
+    estado: 'Esperando piezas',
+    observacion:
+      'Reparación autorizada. Hemos cursado el pedido del recambio original al proveedor oficial.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Entrada en taller.', horasAtras: 42 },
+      { estado: 'Diagnóstico realizado', nota: 'Diagnóstico completado.', horasAtras: 36 },
+      {
+        estado: 'Esperando piezas',
+        nota: 'Recambio solicitado al distribuidor oficial.',
+        horasAtras: 16,
+      },
+    ],
+  },
+  {
+    estado: 'En reparación',
+    observacion:
+      'El equipo técnico está trabajando activamente en tu vehículo realizando el montaje y ajuste de componentes.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Entrada en taller.', horasAtras: 32 },
+      { estado: 'Diagnóstico realizado', nota: 'Avería confirmada.', horasAtras: 24 },
+      {
+        estado: 'En reparación',
+        nota: 'Sustitución de piezas y montaje en curso.',
+        horasAtras: 3,
+      },
+    ],
+  },
+  {
+    estado: 'En revisión y pruebas',
+    observacion:
+      'Reparación mecánica completada. Realizando prueba dinámica y control final de seguridad.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Entrada en taller.', horasAtras: 48 },
+      { estado: 'En reparación', nota: 'Trabajos mecánicos ejecutados.', horasAtras: 14 },
+      {
+        estado: 'En revisión y pruebas',
+        nota: 'Verificación de calidad y prueba en carretera.',
+        horasAtras: 2,
+      },
+    ],
+  },
+  {
+    estado: 'Listo para recoger',
+    observacion:
+      '¡Tu vehículo está terminado! Control de calidad superado y disponible para recogida en nuestro horario habitual.',
+    pasos: [
+      { estado: 'Vehículo recibido', nota: 'Recepción en taller.', horasAtras: 54 },
+      { estado: 'En reparación', nota: 'Intervención completada.', horasAtras: 22 },
+      { estado: 'En revisión y pruebas', nota: 'Control final superado.', horasAtras: 5 },
+      {
+        estado: 'Listo para recoger',
+        nota: 'Vehículo terminado y preparado para entrega.',
+        horasAtras: 1,
+      },
+    ],
+  },
+];
+
+function buildPrototypeTrackingForPlate(normalizedPlate: string): PublicTrackingResult {
+  let hash = 0;
+  for (let i = 0; i < normalizedPlate.length; i++) {
+    hash = (hash * 31 + normalizedPlate.charCodeAt(i)) >>> 0;
+  }
+
+  const car = PROTOTYPE_VEHICLES[hash % PROTOTYPE_VEHICLES.length];
+  const scenario = PROTOTYPE_SCENARIOS[hash % PROTOTYPE_SCENARIOS.length];
+  const now = Date.now();
+  const hoursAgo = (h: number) => new Date(now - h * 3600 * 1000).toISOString();
+  const hoursAhead = (h: number) => new Date(now + h * 3600 * 1000).toISOString().slice(0, 16);
+
+  const firstStep = scenario.pasos[0];
+  const lastStep = scenario.pasos[scenario.pasos.length - 1];
+  const codeNum = 1000 + (hash % 9000);
+
+  return {
+    codigo_seguimiento: `TT-${new Date().getFullYear()}-${codeNum}`,
+    matricula: normalizedPlate,
+    marca: car.marca,
+    modelo: car.modelo,
+    estado_actual: scenario.estado,
+    fecha_entrada: hoursAgo(firstStep.horasAtras),
+    fecha_estimada_entrega:
+      scenario.estado === 'Listo para recoger' ? hoursAhead(2) : hoursAhead(24),
+    fecha_ultima_actualizacion: hoursAgo(lastStep.horasAtras),
+    observaciones_publicas: scenario.observacion,
+    historial_publico: [...scenario.pasos]
+      .sort((a, b) => a.horasAtras - b.horasAtras)
+      .map((p, idx) => ({
+        id: `proto_his_${idx}`,
+        estado: p.estado,
+        fecha: hoursAgo(p.horasAtras),
+        observacion_publica: p.nota,
+      })),
+    taller: getPublicWorkshopInfo(),
+    es_simulacion_prototipo: true,
   };
 }
 
